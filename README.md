@@ -1,33 +1,72 @@
-This is a [Plasmo extension](https://docs.plasmo.com/) project bootstrapped with [`plasmo init`](https://www.npmjs.com/package/plasmo).
+# Sleuth - Beautiful Network Inspector
 
-## Getting Started
+Sleuth is a Chrome extension that provides a beautiful and feature-rich network inspector, offering a better visual experience compared to Chrome's native Network panel.
 
-First, run the development server:
+## Features
+
+- 🔍 **Beautiful Network Inspector**: View network requests in a clean, organized interface
+- 🔄 **Real-time Updates**: See network requests as they happen
+- 🧩 **Advanced Filtering**: Filter requests by URL, method, status code, and content type
+- 🎨 **Beautiful Response Viewer**: JSON responses are displayed in a collapsible tree view
+- 📋 **Quick Shortcuts**: Copy URL, auth headers, and cURL commands with a single click
+- ⚙️ **Customizable Settings**: Configure shortcuts and appearance to your preference
+
+## Installation
+
+### From Chrome Web Store (Coming Soon)
+
+1. Go to [Chrome Web Store](#)
+2. Click "Add to Chrome"
+3. Click "Add extension"
+
+### From Source
+
+1. Clone this repository
+2. Run `pnpm install` to install dependencies
+3. Run `pnpm dev` to start the development server
+4. Go to `chrome://extensions/`
+5. Enable "Developer mode"
+6. Click "Load unpacked" and select the `build/chrome-mv3-dev` directory
+
+## Usage
+
+### Network Inspector
+
+1. Open Chrome DevTools (F12 or Ctrl+Shift+I / Cmd+Option+I)
+2. Click on the "Sleuth" tab
+3. Browse the web and see all network requests in the panel
+
+### Quick Shortcuts
+
+Enable shortcuts in the extension popup or settings page to:
+- Copy URL
+- Copy Authorization header
+- Copy as cURL command
+
+These shortcuts appear automatically when network requests are made.
+
+## Development
+
+This project is built with [Plasmo](https://www.plasmo.com/), a browser extension framework for building extensions with React.
 
 ```bash
+# Install dependencies
+pnpm install
+
+# Start development server
 pnpm dev
-# or
-npm run dev
-```
 
-Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
-
-You can start editing the popup by modifying `popup.tsx`. It should auto-update as you make changes. To add an options page, simply add a `options.tsx` file to the root of the project, with a react component default exported. Likewise to add a content page, add a `content.ts` file to the root of the project, importing some module and do some logic, then reload the extension on your browser.
-
-For further guidance, [visit our Documentation](https://docs.plasmo.com/)
-
-## Making production build
-
-Run the following:
-
-```bash
+# Build extension
 pnpm build
-# or
-npm run build
+
+# Package extension
+pnpm package
 ```
 
-This should create a production bundle for your extension, ready to be zipped and published to the stores.
+## License
 
-## Submit to the webstores
+MIT
 
-The easiest way to deploy your Plasmo extension is to use the built-in [bpp](https://bpp.browser.market) GitHub action. Prior to using this action however, make sure to build your extension and upload the first version to the store to establish the basic credentials. Then, simply follow [this setup instruction](https://docs.plasmo.com/framework/workflows/submit) and you should be on your way for automated submission!
+## Author
+
+Built with ❤️ by [Shubham Singh](https://github.com/shubhsherl)

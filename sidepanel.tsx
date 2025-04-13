@@ -2,13 +2,13 @@ import { useState, useEffect } from "react"
 import "./styles.css"
 import NetworkPanel from "./tabs/network"
 
-function IndexPopup() {
+function SidePanel() {
   const [settings, setSettings] = useState({
     enableShortcuts: true,
     showCurlShortcut: true,
     showAuthShortcut: true,
     showUrlShortcut: true,
-    theme: "light",
+    theme: "dark", // Default to dark theme
     maxRequests: 1000
   })
   const [activeTab, setActiveTab] = useState("network")
@@ -28,7 +28,7 @@ function IndexPopup() {
         showCurlShortcut: result.showCurlShortcut ?? true,
         showAuthShortcut: result.showAuthShortcut ?? true,
         showUrlShortcut: result.showUrlShortcut ?? true,
-        theme: result.theme ?? "light",
+        theme: result.theme ?? "dark", // Default to dark theme
         maxRequests: result.maxRequests ?? 1000
       })
     })
@@ -38,31 +38,32 @@ function IndexPopup() {
   const handleSettingChange = (key: string, value: any) => {
     const newSettings = { ...settings, [key]: value }
     setSettings(newSettings)
-    
     chrome.storage.sync.set({ [key]: value })
   }
   
-  // Determine theme-based styles
-  const isDark = settings.theme === "dark" || 
-                (settings.theme === "system" && 
-                 window.matchMedia && 
-                 window.matchMedia('(prefers-color-scheme: dark)').matches)
+  // Toggle theme
+  const toggleTheme = () => {
+    const newTheme = settings.theme === "dark" ? "light" : "dark"
+    handleSettingChange("theme", newTheme)
+  }
   
-  // Theme colors
+  // Dark mode styles
+  const isDark = settings.theme === "dark"
   const bgColor = isDark ? "#1e2130" : "#fff"
-  const textColor = isDark ? "#e9ecef" : "#333"
+  const textColor = isDark ? "#fff" : "#333"
+  const borderColor = isDark ? "#2d3348" : "#ddd"
   const headerBgColor = isDark ? "#1a1c28" : "#f5f5f5"
-  const borderColor = isDark ? "#4a5568" : "#ddd"
-  const cardBg = isDark ? "#242a38" : "#fff"
+  const buttonBgActive = isDark ? "#2d3348" : "#fff"
+  const buttonBgInactive = isDark ? "transparent" : "transparent"
+  const buttonBorderActive = isDark ? "#4285F4" : "#4285F4"
   const inputBg = isDark ? "#2d3348" : "#fff"
-  const buttonBg = isDark ? "#2d3348" : "#e9ecef"
-  const linkBg = isDark ? "#242a38" : "#f5f5f5"
+  const sectionBg = isDark ? "#1a1c28" : "#f5f5f5"
   
   return (
     <div
       style={{
-        width: "800px",
-        height: "600px",
+        width: "100%",
+        height: "100vh",
         padding: "0",
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
         display: "flex",
@@ -80,9 +81,9 @@ function IndexPopup() {
         <button 
           style={{
             padding: "12px 16px",
-            backgroundColor: activeTab === "network" ? bgColor : "transparent",
+            backgroundColor: activeTab === "network" ? buttonBgActive : buttonBgInactive,
             border: "none",
-            borderBottom: activeTab === "network" ? "2px solid #4285F4" : "none",
+            borderBottom: activeTab === "network" ? `2px solid ${buttonBorderActive}` : "none",
             cursor: "pointer",
             fontWeight: activeTab === "network" ? "bold" : "normal",
             color: textColor
@@ -94,9 +95,9 @@ function IndexPopup() {
         <button 
           style={{
             padding: "12px 16px",
-            backgroundColor: activeTab === "settings" ? bgColor : "transparent",
+            backgroundColor: activeTab === "settings" ? buttonBgActive : buttonBgInactive,
             border: "none",
-            borderBottom: activeTab === "settings" ? "2px solid #4285F4" : "none",
+            borderBottom: activeTab === "settings" ? `2px solid ${buttonBorderActive}` : "none",
             cursor: "pointer",
             fontWeight: activeTab === "settings" ? "bold" : "normal",
             color: textColor
@@ -107,28 +108,28 @@ function IndexPopup() {
       </div>
       
       {/* Content area */}
-      <div style={{ flex: 1, overflow: "auto" }}>
+      <div style={{ flex: 1, overflow: "hidden" }}>
         {activeTab === "network" && (
-          <div style={{ height: "100%" }}>
-            <NetworkPanel 
-              theme={settings.theme} 
-              enableShortcuts={settings.enableShortcuts}
-              showCurlShortcut={settings.showCurlShortcut}
-              showAuthShortcut={settings.showAuthShortcut}
-              showUrlShortcut={settings.showUrlShortcut}
-            />
+          <div style={{ height: "100%", position: "relative" }}>
+            <NetworkPanel theme={settings.theme} />
           </div>
         )}
         
         {activeTab === "settings" && (
-          <div style={{ padding: "16px", backgroundColor: bgColor, color: textColor }}>
-            <h2 style={{ marginTop: 0, color: textColor, marginBottom: "16px" }}>
+          <div style={{ padding: "16px", overflowY: "auto", height: "100%" }}>
+            <h2 style={{ marginTop: 0, marginBottom: "16px", color: textColor }}>
               Sleuth Settings
             </h2>
             
             {/* Shortcuts Section */}
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "12px", color: textColor }}>Shortcuts</h3>
+            <div style={{ 
+              marginBottom: "24px", 
+              backgroundColor: sectionBg, 
+              padding: "16px", 
+              borderRadius: "6px",
+              border: `1px solid ${borderColor}`
+            }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: "600" }}>Shortcuts</h3>
               
               <div style={{ marginBottom: "12px" }}>
                 <label style={{ display: "flex", alignItems: "center", fontSize: "14px" }}>
@@ -178,11 +179,17 @@ function IndexPopup() {
             </div>
             
             {/* Appearance Section */}
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "12px", color: textColor }}>Appearance</h3>
+            <div style={{ 
+              marginBottom: "24px", 
+              backgroundColor: sectionBg, 
+              padding: "16px", 
+              borderRadius: "6px",
+              border: `1px solid ${borderColor}`
+            }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: "600" }}>Appearance</h3>
               
               <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontSize: "14px" }}>Theme:</label>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "14px" }}>Theme:</label>
                 <select
                   value={settings.theme}
                   onChange={(e) => handleSettingChange("theme", e.target.value)}
@@ -191,9 +198,9 @@ function IndexPopup() {
                     border: `1px solid ${borderColor}`,
                     borderRadius: "4px",
                     width: "100%",
-                    fontSize: "14px",
                     backgroundColor: inputBg,
-                    color: textColor
+                    color: textColor,
+                    fontSize: "14px"
                   }}
                 >
                   <option value="light">Light</option>
@@ -204,11 +211,17 @@ function IndexPopup() {
             </div>
             
             {/* Network Inspector Section */}
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "12px", color: textColor }}>Network Inspector</h3>
+            <div style={{ 
+              marginBottom: "24px", 
+              backgroundColor: sectionBg, 
+              padding: "16px", 
+              borderRadius: "6px",
+              border: `1px solid ${borderColor}`
+            }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: "600" }}>Network Inspector</h3>
               
               <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontSize: "14px" }}>Maximum requests to store:</label>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "14px" }}>Maximum requests to store:</label>
                 <input
                   type="number"
                   min="100"
@@ -220,35 +233,37 @@ function IndexPopup() {
                     border: `1px solid ${borderColor}`,
                     borderRadius: "4px",
                     width: "100%",
-                    fontSize: "14px",
                     backgroundColor: inputBg,
-                    color: textColor
+                    color: textColor,
+                    fontSize: "14px"
                   }}
                 />
               </div>
             </div>
             
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "24px" }}>
+            {/* GitHub Link */}
+            <div style={{ marginBottom: "16px" }}>
               <a
                 href="https://github.com/shubhsherl/sleuth"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
                   padding: "8px 12px",
-                  backgroundColor: linkBg,
+                  backgroundColor: isDark ? "#2d3348" : "#f5f5f5",
                   color: textColor,
                   border: `1px solid ${borderColor}`,
                   borderRadius: "4px",
                   textDecoration: "none",
                   textAlign: "center",
-                  fontSize: "14px"
+                  fontSize: "14px",
+                  display: "block"
                 }}>
                 View on GitHub
               </a>
             </div>
             
-            <div style={{ marginTop: "24px", fontSize: "12px", color: isDark ? "#adb5bd" : "#888", textAlign: "center" }}>
-              Sleuth v0.0.1 &bull; Made with ❤️ by Shubham Singh
+            <div style={{ marginTop: "16px", fontSize: "12px", color: isDark ? "#888" : "#888", textAlign: "center" }}>
+              v0.0.1 &bull; Made with ❤️ by Shubham Singh
             </div>
           </div>
         )}
@@ -257,4 +272,4 @@ function IndexPopup() {
   )
 }
 
-export default IndexPopup
+export default SidePanel 
