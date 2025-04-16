@@ -35,7 +35,6 @@
     "permissions": [
       "storage",
       "webRequest",
-      "tabs",
       "clipboardWrite",
       "sidePanel",
       "debugger"
