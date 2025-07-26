@@ -2,6 +2,17 @@ import type { PlasmoCSConfig } from "plasmo"
 import { useEffect, useState } from "react"
 import "../styles.css"
 
+// Declare browser type for TypeScript
+declare global {
+  interface Window {
+    browser?: {
+      sidebarAction?: {
+        toggle: () => void;
+      };
+    };
+  }
+}
+
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   all_frames: true
@@ -82,15 +93,21 @@ const ShortcutOverlay = () => {
           body: body
         }
         
-        const mousePos = { x: window.event?.clientX || 0, y: window.event?.clientY || 0 }
+        // Use MouseEvent instead of window.event which is not reliable
+        let mousePos = { x: 0, y: 0 }
         showShortcutMenu(requestData, mousePos)
       }
       
       return originalXhrSend.apply(this, arguments as any)
     }
     
+    // Keyboard shortcuts are now handled by the browser's command API
+    // This is configured in the manifest.json file
+    // No need for custom keyboard event listeners
+    
     return () => {
       window.removeEventListener("fetch", handleFetchEvent, true)
+      // No need to remove keyboard listener as we're using the browser's command API
       XMLHttpRequest.prototype.open = originalXhrOpen
       XMLHttpRequest.prototype.send = originalXhrSend
     }
@@ -110,7 +127,8 @@ const ShortcutOverlay = () => {
       headers: {},
     }
     
-    const mousePos = { x: window.event?.clientX || 0, y: window.event?.clientY || 0 }
+    // Use default position since window.event is unreliable
+    const mousePos = { x: 0, y: 0 }
     showShortcutMenu(requestData, mousePos)
   }
   

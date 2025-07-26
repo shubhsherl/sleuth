@@ -1,0 +1,46 @@
+{
+  "manifest_version": 2,
+  "name": "Sleuth",
+  "version": "0.0.2",
+  "description": "Extension to beautify network logs and some quick shortcuts",
+  "author": "Shubham Singh",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "sleuth@shubhamsingh.com",
+      "strict_min_version": "57.0"
+    }
+  },
+  "commands": {
+    "toggle-sidebar": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Toggle Sleuth sidebar"
+    }
+  },
+  "permissions": [
+    "storage",
+    "webRequest",
+    "webRequestBlocking",
+    "clipboardWrite",
+    "<all_urls>",
+    "tabs",
+    "devtools"
+  ],
+  "browser_action": {
+    "default_title": "Sleuth",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "assets/icon.png",
+      "48": "assets/icon.png",
+      "128": "assets/icon.png"
+    }
+  },
+  "sidebar_action": {
+    "default_title": "Sleuth",
+    "default_panel": "sidepanel.html",
+    "default_icon": "assets/icon.png"
+  },
+  "devtools_page": "devtools.html",
+  "content_security_policy": "script-src 'self'; object-src 'self';"
+} 

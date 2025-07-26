@@ -131,7 +131,7 @@ const getResourceTypeIcon = (url: string, contentType?: string, type?: string) =
     if (['html', 'htm'].includes(extension)) return ResourceTypeIcons.document();
     if (['css'].includes(extension)) return ResourceTypeIcons.stylesheet();
     if (['js', 'jsx', 'ts', 'tsx'].includes(extension)) return ResourceTypeIcons.script();
-    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(extension)) return ResourceTypeIcons.image();
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(extension)) return ResourceTypeIcons.image();
     if (['woff', 'woff2', 'ttf', 'otf', 'eot'].includes(extension)) return ResourceTypeIcons.font();
   }
   
@@ -201,6 +201,7 @@ const Toast = ({ toast, onClose }: { toast: Toast, onClose: (id: string) => void
   );
 };
 
+// Add window size tracking to the component
 const NetworkPanel = ({ 
   theme = "dark",
   enableShortcuts = true,
@@ -215,6 +216,11 @@ const NetworkPanel = ({
   const [toasts, setToasts] = useState<Toast[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const hoverTimeoutRef = useRef<number | null>(null)
+  const [width, setWidth] = useState(window.innerWidth);
+  const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 600);
+  
+  // Monitoring state
+  const [isMonitoringEnabled, setIsMonitoringEnabled] = useState<boolean>(true)
   
   // Filter states
   const [filters, setFilters] = useState<FilterOptions>({
@@ -254,23 +260,72 @@ const NetworkPanel = ({
   const cardBg = isDark ? "#242a38" : "#fff"
   const hoverCardBg = isDark ? "rgba(45, 51, 72, 0.85)" : "rgba(255, 255, 255, 0.85)"
   
+  // Track window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWidth(window.innerWidth);
+      setIsSmallScreen(window.innerWidth < 600);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   // Connect to background script
   useEffect(() => {
-    const newPort = chrome.runtime.connect({ name: "sleuth-network" })
-    
-    // Store port reference in state
-    setPort(newPort)
-    
-    newPort.onMessage.addListener((message) => {
-      if (message.type === "networkRequests") {
-        setRequests(message.data)
-      }
-    })
-    
-    return () => {
-      newPort.disconnect()
+    try {
+      console.log("Connecting to background script");
+      const newPort = chrome.runtime.connect({ name: "sleuth-network" });
+      
+      // Store port reference in state
+      setPort(newPort);
+      
+      // Add message listener
+      newPort.onMessage.addListener((message) => {
+        console.log("Received message from background:", message.type);
+        
+        if (message.type === "networkRequests") {
+          console.log(`Received ${message.data.length} network requests`);
+          setRequests(message.data);
+        }
+        else if (message.type === "monitoringState") {
+          console.log(`Received monitoring state: ${message.isEnabled}`);
+          setIsMonitoringEnabled(message.isEnabled);
+        }
+      });
+      
+      // Cleanup on unmount
+      return () => {
+        console.log("Disconnecting from background script");
+        newPort.disconnect();
+      };
+    } catch (error) {
+      console.error("Failed to connect to background script:", error);
     }
   }, [])
+  
+  // Toggle monitoring state
+  const toggleMonitoring = () => {
+    if (port) {
+      const newState = !isMonitoringEnabled;
+      
+      console.log(`Toggling monitoring state to: ${newState}`);
+      
+      // Optimistically update state
+      setIsMonitoringEnabled(newState);
+      
+      // Send message to background script
+      port.postMessage({ 
+        type: newState ? "startMonitoring" : "pauseMonitoring" 
+      });
+      
+      // Show user feedback
+      showToast(newState ? "Network monitoring enabled" : "Network monitoring paused", "info");
+    } else {
+      console.error("Cannot toggle monitoring: port is not connected");
+      showToast("Error: Cannot connect to monitoring service", "error");
+    }
+  };
   
   // Clear all requests
   const handleClearRequests = () => {
@@ -599,38 +654,85 @@ const NetworkPanel = ({
   
   return (
     <div ref={containerRef} className="flex flex-col h-screen" style={{ backgroundColor: bgColor, color: textColor }}>
-      {/* Header */}
-      <div style={{ backgroundColor: headerBgColor, padding: "12px 16px", borderBottom: `1px solid ${borderColor}` }}>
-        <div className="flex items-center justify-between">
+      {/* Header with search/filters & controls */}
+      <div style={{ borderBottom: `1px solid ${borderColor}`, backgroundColor: headerBgColor, padding: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: isSmallScreen ? "8px" : "0", justifyContent: "space-between" }}>
           <h1 style={{ margin: 0, fontSize: "18px", fontWeight: "bold" }}>
             Network Sleuth
             <span style={{ fontSize: "14px", fontWeight: "normal", opacity: 0.7, marginLeft: "8px" }}>
               {filteredRequests.length} requests
             </span>
           </h1>
-          <div className="flex space-x-2">
+          
+          {/* Show buttons on first row for all screens */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {/* Clear button */}
             <button 
               onClick={handleClearRequests}
               style={{ 
-                padding: "4px 8px", 
+                padding: "6px",
                 backgroundColor: "transparent", 
                 color: textColor,
                 border: `1px solid ${borderColor}`,
                 borderRadius: "4px",
-                fontSize: "12px",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 width: "32px",
-                height: "28px"
-              }}>
+                height: "32px"
+              }}
+              title="Clear all requests"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
             </button>
             
+            {/* Monitoring toggle button */}
+            <button 
+              onClick={toggleMonitoring}
+              style={{ 
+                padding: "6px",
+                backgroundColor: isMonitoringEnabled ? (isDark ? "#173626" : "#d4edda") : (isDark ? "#372429" : "#f8d7da"),
+                color: isMonitoringEnabled ? (isDark ? "#28a745" : "#155724") : (isDark ? "#dc3545" : "#721c24"),
+                border: `1px solid ${isMonitoringEnabled ? (isDark ? "#28a745" : "#c3e6cb") : (isDark ? "#dc3545" : "#f5c6cb")}`,
+                borderRadius: "4px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "32px",
+                height: "32px"
+              }}
+              title={isMonitoringEnabled ? "Pause monitoring" : "Resume monitoring"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isMonitoringEnabled ? (
+                  <>
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                  </>
+                ) : (
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                )}
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        {/* Second row with filters and buttons on small screens */}
+        <div style={{ 
+          display: "flex", 
+          flexDirection: isSmallScreen ? "column" : "row",
+          gap: isSmallScreen ? "8px" : "0"
+        }}>
+          <div className="flex flex-wrap gap-2" style={{ 
+            flex: "1", 
+            marginRight: isSmallScreen ? "0" : "8px",
+            marginBottom: isSmallScreen ? "8px" : "0"
+          }}>
             {/* Filter by URL */}
             <input
               type="text"
@@ -644,213 +746,227 @@ const NetworkPanel = ({
                 fontSize: "12px",
                 backgroundColor: isDark ? "#2d3348" : "#fff",
                 color: textColor,
-                width: "150px"
+                width: isSmallScreen ? "100%" : "150px"
               }}
             />
             
-            {/* Filter by method - multi-select */}
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => toggleFilter("method-filter")}
-                id="method-filter-button"
-                style={{ 
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: "4px",
-                  padding: "4px 8px",
-                  fontSize: "12px",
-                  backgroundColor: isDark ? "#2d3348" : "#fff",
-                  color: textColor,
-                  minWidth: "120px",
-                  textAlign: "left",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center"
-                }}>
-                {filters.method.length > 0 ? `Methods (${filters.method.length})` : "All Methods"}
-                <span style={{ marginLeft: "4px" }}>▼</span>
-              </button>
-              <div 
-                id="method-filter"
-                style={{ 
-                  display: "none", 
-                  position: "absolute", 
-                  top: "100%", 
-                  left: 0, 
-                  zIndex: 10,
-                  backgroundColor: isDark ? "#2d3348" : "#fff",
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: "4px",
-                  width: "150px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                  marginTop: "4px",
-                  maxHeight: "200px",
-                  overflowY: "auto"
-                }}
-              >
-                {["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"].map(method => (
-                  <div 
-                    key={method}
-                    style={{ 
-                      padding: "6px 8px", 
-                      cursor: "pointer",
-                      backgroundColor: filters.method.includes(method) ? (isDark ? "#3a4160" : "#e6f7ff") : "transparent",
-                      display: "flex",
-                      alignItems: "center"
-                    }}
-                    onClick={() => handleFilterChange("method", method)}
-                  >
-                    <input 
-                      type="checkbox" 
-                      checked={filters.method.includes(method)} 
-                      onChange={() => {}} 
-                      style={{ marginRight: "6px" }}
-                    />
-                    {method}
-                  </div>
-                ))}
+            {/* Filters wrapper for better responsive layout */}
+            <div style={{ 
+              display: "flex", 
+              flexWrap: "wrap",
+              gap: "8px",
+              flex: isSmallScreen ? "1" : "initial",
+              width: isSmallScreen ? "100%" : "auto"
+            }}>
+              {/* Filter by method - multi-select */}
+              <div style={{ position: "relative", flex: isSmallScreen ? "1" : "initial" }}>
+                <button
+                  onClick={() => toggleFilter("method-filter")}
+                  id="method-filter-button"
+                  style={{ 
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: "4px",
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    backgroundColor: isDark ? "#2d3348" : "#fff",
+                    color: textColor,
+                    minWidth: "120px",
+                    width: isSmallScreen ? "100%" : "auto",
+                    textAlign: "left",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                  {filters.method.length > 0 ? `Methods (${filters.method.length})` : "All Methods"}
+                  <span style={{ marginLeft: "4px" }}>▼</span>
+                </button>
+                <div 
+                  id="method-filter"
+                  style={{ 
+                    display: "none", 
+                    position: "absolute", 
+                    top: "100%", 
+                    left: 0, 
+                    zIndex: 10,
+                    backgroundColor: isDark ? "#2d3348" : "#fff",
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: "4px",
+                    width: "150px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                    marginTop: "4px",
+                    maxHeight: "200px",
+                    overflowY: "auto"
+                  }}
+                >
+                  {["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"].map(method => (
+                    <div 
+                      key={method}
+                      style={{ 
+                        padding: "6px 8px", 
+                        cursor: "pointer",
+                        backgroundColor: filters.method.includes(method) ? (isDark ? "#3a4160" : "#e6f7ff") : "transparent",
+                        display: "flex",
+                        alignItems: "center"
+                      }}
+                      onClick={() => handleFilterChange("method", method)}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={filters.method.includes(method)} 
+                        onChange={() => {}} 
+                        style={{ marginRight: "6px" }}
+                      />
+                      {method}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-            
-            {/* Filter by status - multi-select */}
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => toggleFilter("status-filter")}
-                id="status-filter-button"
-                style={{ 
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: "4px",
-                  padding: "4px 8px",
-                  fontSize: "12px",
-                  backgroundColor: isDark ? "#2d3348" : "#fff",
-                  color: textColor,
-                  minWidth: "120px",
-                  textAlign: "left",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center"
-                }}>
-                {filters.status.length > 0 ? `Status (${filters.status.length})` : "All Status"}
-                <span style={{ marginLeft: "4px" }}>▼</span>
-              </button>
-              <div 
-                id="status-filter"
-                style={{ 
-                  display: "none", 
-                  position: "absolute", 
-                  top: "100%", 
-                  left: 0, 
-                  zIndex: 10,
-                  backgroundColor: isDark ? "#2d3348" : "#fff",
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: "4px",
-                  width: "150px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                  marginTop: "4px",
-                  maxHeight: "200px",
-                  overflowY: "auto"
-                }}
-              >
-                {[
-                  { value: "2", label: "2xx (Success)" },
-                  { value: "3", label: "3xx (Redirect)" },
-                  { value: "4", label: "4xx (Client Error)" },
-                  { value: "5", label: "5xx (Server Error)" }
-                ].map(status => (
-                  <div 
-                    key={status.value}
-                    style={{ 
-                      padding: "6px 8px", 
-                      cursor: "pointer",
-                      backgroundColor: filters.status.includes(status.value) ? (isDark ? "#3a4160" : "#e6f7ff") : "transparent",
-                      display: "flex",
-                      alignItems: "center"
-                    }}
-                    onClick={() => handleFilterChange("status", status.value)}
-                  >
-                    <input 
-                      type="checkbox" 
-                      checked={filters.status.includes(status.value)} 
-                      onChange={() => {}} 
-                      style={{ marginRight: "6px" }}
-                    />
-                    {status.label}
-                  </div>
-                ))}
+              
+              {/* Filter by status - multi-select */}
+              <div style={{ position: "relative", flex: isSmallScreen ? "1" : "initial" }}>
+                <button
+                  onClick={() => toggleFilter("status-filter")}
+                  id="status-filter-button"
+                  style={{ 
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: "4px",
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    backgroundColor: isDark ? "#2d3348" : "#fff",
+                    color: textColor,
+                    minWidth: "120px",
+                    width: isSmallScreen ? "100%" : "auto",
+                    textAlign: "left",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                  {filters.status.length > 0 ? `Status (${filters.status.length})` : "All Status"}
+                  <span style={{ marginLeft: "4px" }}>▼</span>
+                </button>
+                <div 
+                  id="status-filter"
+                  style={{ 
+                    display: "none", 
+                    position: "absolute", 
+                    top: "100%", 
+                    left: 0, 
+                    zIndex: 10,
+                    backgroundColor: isDark ? "#2d3348" : "#fff",
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: "4px",
+                    width: "150px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                    marginTop: "4px",
+                    maxHeight: "200px",
+                    overflowY: "auto"
+                  }}
+                >
+                  {[
+                    { value: "2", label: "2xx (Success)" },
+                    { value: "3", label: "3xx (Redirect)" },
+                    { value: "4", label: "4xx (Client Error)" },
+                    { value: "5", label: "5xx (Server Error)" }
+                  ].map(status => (
+                    <div 
+                      key={status.value}
+                      style={{ 
+                        padding: "6px 8px", 
+                        cursor: "pointer",
+                        backgroundColor: filters.status.includes(status.value) ? (isDark ? "#3a4160" : "#e6f7ff") : "transparent",
+                        display: "flex",
+                        alignItems: "center"
+                      }}
+                      onClick={() => handleFilterChange("status", status.value)}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={filters.status.includes(status.value)} 
+                        onChange={() => {}} 
+                        style={{ marginRight: "6px" }}
+                      />
+                      {status.label}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-            
-            {/* Filter by type - multi-select */}
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => toggleFilter("type-filter")}
-                id="type-filter-button"
-                style={{ 
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: "4px",
-                  padding: "4px 8px",
-                  fontSize: "12px",
-                  backgroundColor: isDark ? "#2d3348" : "#fff",
-                  color: textColor,
-                  minWidth: "120px",
-                  textAlign: "left",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center"
-                }}>
-                {filters.type.length > 0 ? `Type (${filters.type.length})` : "All Types"}
-                <span style={{ marginLeft: "4px" }}>▼</span>
-              </button>
-              <div 
-                id="type-filter"
-                style={{ 
-                  display: "none", 
-                  position: "absolute", 
-                  top: "100%", 
-                  left: 0, 
-                  zIndex: 10,
-                  backgroundColor: isDark ? "#2d3348" : "#fff",
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: "4px",
-                  width: "150px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                  marginTop: "4px",
-                  maxHeight: "200px",
-                  overflowY: "auto"
-                }}
-              >
-                {[
-                  { value: "fetch", label: "Fetch" },
-                  { value: "xhr", label: "XHR" },
-                  { value: "script", label: "Script" },
-                  { value: "stylesheet", label: "Stylesheet" },
-                  { value: "document", label: "Document" },
-                  { value: "image", label: "Image" },
-                  { value: "font", label: "Font" },
-                  { value: "other", label: "Other" }
-                ].map(type => (
-                  <div 
-                    key={type.value}
-                    style={{ 
-                      padding: "6px 8px", 
-                      cursor: "pointer",
-                      backgroundColor: filters.type.includes(type.value) ? (isDark ? "#3a4160" : "#e6f7ff") : "transparent",
-                      display: "flex",
-                      alignItems: "center"
-                    }}
-                    onClick={() => handleFilterChange("type", type.value)}
-                  >
-                    <input 
-                      type="checkbox" 
-                      checked={filters.type.includes(type.value)} 
-                      onChange={() => {}} 
-                      style={{ marginRight: "6px" }}
-                    />
-                    {type.label}
-                  </div>
-                ))}
+              
+              {/* Filter by type - multi-select */}
+              <div style={{ position: "relative", flex: isSmallScreen ? "1" : "initial" }}>
+                <button
+                  onClick={() => toggleFilter("type-filter")}
+                  id="type-filter-button"
+                  style={{ 
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: "4px",
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    backgroundColor: isDark ? "#2d3348" : "#fff",
+                    color: textColor,
+                    minWidth: "120px",
+                    width: isSmallScreen ? "100%" : "auto",
+                    textAlign: "left",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                  {filters.type.length > 0 ? `Type (${filters.type.length})` : "All Types"}
+                  <span style={{ marginLeft: "4px" }}>▼</span>
+                </button>
+                <div 
+                  id="type-filter"
+                  style={{ 
+                    display: "none", 
+                    position: "absolute", 
+                    top: "100%", 
+                    left: 0, 
+                    zIndex: 10,
+                    backgroundColor: isDark ? "#2d3348" : "#fff",
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: "4px",
+                    width: "150px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                    marginTop: "4px",
+                    maxHeight: "200px",
+                    overflowY: "auto"
+                  }}
+                >
+                  {[
+                    { value: "fetch", label: "Fetch" },
+                    { value: "xhr", label: "XHR" },
+                    { value: "script", label: "Script" },
+                    { value: "stylesheet", label: "Stylesheet" },
+                    { value: "document", label: "Document" },
+                    { value: "image", label: "Image" },
+                    { value: "font", label: "Font" },
+                    { value: "other", label: "Other" }
+                  ].map(type => (
+                    <div 
+                      key={type.value}
+                      style={{ 
+                        padding: "6px 8px", 
+                        cursor: "pointer",
+                        backgroundColor: filters.type.includes(type.value) ? (isDark ? "#3a4160" : "#e6f7ff") : "transparent",
+                        display: "flex",
+                        alignItems: "center"
+                      }}
+                      onClick={() => handleFilterChange("type", type.value)}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={filters.type.includes(type.value)} 
+                        onChange={() => {}} 
+                        style={{ marginRight: "6px" }}
+                      />
+                      {type.label}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
+          
+          {/* Buttons are now always shown in the header row */}
         </div>
       </div>
       
@@ -862,7 +978,9 @@ const NetworkPanel = ({
             <thead className="sticky top-0" style={{ backgroundColor: headerBgColor }}>
               <tr style={{ textAlign: "left" }}>
                 <th style={{ padding: "8px 12px" }}>Method</th>
-                <th style={{ padding: "8px 4px", width: "24px" }}></th>
+                {!isSmallScreen && (
+                  <th style={{ padding: "8px 4px", width: "24px" }}></th>
+                )}
                 <th style={{ padding: "8px 12px" }}>Name</th>
                 <th style={{ padding: "8px 12px" }}>Status</th>
                 <th style={{ padding: "8px 12px", textAlign: "right" }}></th>
@@ -904,9 +1022,11 @@ const NetworkPanel = ({
                         {request.method}
                       </span>
                     </td>
-                    <td style={{ padding: "8px 4px", textAlign: "center" }}>
-                      {getResourceTypeIcon(request.url, request.contentType, requestType)}
-                    </td>
+                    {!isSmallScreen && (
+                      <td style={{ padding: "8px 4px", textAlign: "center" }}>
+                        {getResourceTypeIcon(request.url, request.contentType, requestType)}
+                      </td>
+                    )}
                     <td style={{ padding: "8px 12px", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       <span>{new URL(request.url).pathname}</span>
                     </td>
@@ -1041,6 +1161,17 @@ const NetworkPanel = ({
               {/* Request details tabs */}
               <div className="flex border-b sticky top-0" style={{ backgroundColor: headerBgColor, borderColor }}>
                 <button
+                  onClick={() => setSelectedRequest(null)}
+                  style={{ 
+                    padding: "8px 12px", 
+                    background: "transparent",
+                    border: "none",
+                    color: textColor,
+                    cursor: "pointer",
+                  }}>
+                  &times;
+                </button>
+                <button
                   onClick={() => setActiveTab("headers")}
                   style={{ 
                     padding: "8px 16px", 
@@ -1091,18 +1222,6 @@ const NetworkPanel = ({
                     fontWeight: activeTab === "auth" ? "bold" : "normal",
                   }}>
                   Auth
-                </button>
-                <button
-                  onClick={() => setSelectedRequest(null)}
-                  style={{ 
-                    padding: "8px 12px", 
-                    background: "transparent",
-                    border: "none",
-                    marginLeft: "auto",
-                    color: textColor,
-                    cursor: "pointer",
-                  }}>
-                  &times;
                 </button>
               </div>
               

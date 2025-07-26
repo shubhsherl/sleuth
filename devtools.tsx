@@ -6,8 +6,12 @@ export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"]
 }
 
+// Detect if we're in Firefox
+const isFirefox = typeof browser !== 'undefined';
+
 // Create a panel in DevTools when the extension is loaded
 try {
+  // Create main network panel
   chrome.devtools.panels.create(
     "Sleuth", // Panel title
     "/assets/icon.svg", // Icon path

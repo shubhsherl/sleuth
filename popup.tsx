@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react"
+import { getSettings, saveSetting } from "./utils/storage"
 import "./styles.css"
 import NetworkPanel from "./tabs/network"
+
+// Define minimum supported dimensions
+const MIN_WIDTH = 350;  // px
+const MIN_HEIGHT = 500; // px
 
 function IndexPopup() {
   const [settings, setSettings] = useState({
@@ -8,29 +13,37 @@ function IndexPopup() {
     showCurlShortcut: true,
     showAuthShortcut: true,
     showUrlShortcut: true,
-    theme: "light",
-    maxRequests: 1000
+    theme: "dark",
+    maxRequests: 1000,
+    inactivityTimeout: 10
   })
   const [activeTab, setActiveTab] = useState("network")
+  const [width, setWidth] = useState(window.innerWidth);
+  const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 600);
+  
+  // Track window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWidth(window.innerWidth);
+      setIsSmallScreen(window.innerWidth < 600);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Load settings on component mount
   useEffect(() => {
-    chrome.storage.sync.get([
+    getSettings([
       "enableShortcuts",
       "showCurlShortcut",
       "showAuthShortcut",
       "showUrlShortcut",
       "theme",
-      "maxRequests"
+      "maxRequests",
+      "inactivityTimeout"
     ], (result) => {
-      setSettings({
-        enableShortcuts: result.enableShortcuts ?? true,
-        showCurlShortcut: result.showCurlShortcut ?? true,
-        showAuthShortcut: result.showAuthShortcut ?? true,
-        showUrlShortcut: result.showUrlShortcut ?? true,
-        theme: result.theme ?? "light",
-        maxRequests: result.maxRequests ?? 1000
-      })
+      setSettings(result)
     })
   }, [])
   
@@ -39,7 +52,7 @@ function IndexPopup() {
     const newSettings = { ...settings, [key]: value }
     setSettings(newSettings)
     
-    chrome.storage.sync.set({ [key]: value })
+    saveSetting(key, value)
   }
   
   // Determine theme-based styles
@@ -61,8 +74,10 @@ function IndexPopup() {
   return (
     <div
       style={{
-        width: "800px",
-        height: "600px",
+        width: "100%",
+        height: "100%",
+        minWidth: `${MIN_WIDTH}px`,
+        minHeight: `${MIN_HEIGHT}px`,
         padding: "0",
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
         display: "flex",
@@ -75,17 +90,19 @@ function IndexPopup() {
       <div style={{ 
         display: "flex", 
         borderBottom: `1px solid ${borderColor}`,
-        backgroundColor: headerBgColor
+        backgroundColor: headerBgColor,
+        flexWrap: isSmallScreen ? "wrap" : "nowrap"
       }}>
         <button 
           style={{
-            padding: "12px 16px",
+            padding: isSmallScreen ? "10px 12px" : "12px 16px",
             backgroundColor: activeTab === "network" ? bgColor : "transparent",
             border: "none",
             borderBottom: activeTab === "network" ? "2px solid #4285F4" : "none",
             cursor: "pointer",
             fontWeight: activeTab === "network" ? "bold" : "normal",
-            color: textColor
+            color: textColor,
+            flex: isSmallScreen ? "1 1 50%" : "0 0 auto"
           }}
           onClick={() => setActiveTab("network")}>
           Network Inspector
@@ -93,13 +110,14 @@ function IndexPopup() {
         
         <button 
           style={{
-            padding: "12px 16px",
+            padding: isSmallScreen ? "10px 12px" : "12px 16px",
             backgroundColor: activeTab === "settings" ? bgColor : "transparent",
             border: "none",
             borderBottom: activeTab === "settings" ? "2px solid #4285F4" : "none",
             cursor: "pointer",
             fontWeight: activeTab === "settings" ? "bold" : "normal",
-            color: textColor
+            color: textColor,
+            flex: isSmallScreen ? "1 1 50%" : "0 0 auto"
           }}
           onClick={() => setActiveTab("settings")}>
           Settings
@@ -209,22 +227,89 @@ function IndexPopup() {
               
               <div style={{ marginBottom: "12px" }}>
                 <label style={{ display: "block", marginBottom: "8px", fontSize: "14px" }}>Maximum requests to store:</label>
-                <input
-                  type="number"
-                  min="100"
-                  max="5000"
-                  value={settings.maxRequests}
-                  onChange={(e) => handleSettingChange("maxRequests", parseInt(e.target.value))}
-                  style={{
-                    padding: "8px 12px",
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: "4px",
-                    width: "100%",
-                    fontSize: "14px",
-                    backgroundColor: inputBg,
-                    color: textColor
-                  }}
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <input
+                    type="range"
+                    min="100"
+                    max="5000"
+                    step="100"
+                    value={settings.maxRequests}
+                    onChange={(e) => handleSettingChange("maxRequests", parseInt(e.target.value))}
+                    style={{
+                      flex: "1",
+                      accentColor: isDark ? "#4285F4" : "#4285F4"
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="100"
+                    max="5000"
+                    value={settings.maxRequests}
+                    onChange={(e) => handleSettingChange("maxRequests", parseInt(e.target.value))}
+                    style={{
+                      padding: "8px 12px",
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: "4px",
+                      width: "80px",
+                      fontSize: "14px",
+                      backgroundColor: inputBg,
+                      color: textColor,
+                      textAlign: "center"
+                    }}
+                  />
+                </div>
+                <p style={{ 
+                  fontSize: "12px", 
+                  color: isDark ? "#adb5bd" : "#888", 
+                  marginTop: "4px",
+                  marginBottom: "0"
+                }}>
+                  Higher values may increase memory usage
+                </p>
+              </div>
+              
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ display: "block", marginBottom: "8px", fontSize: "14px" }}>
+                  Auto-pause after inactivity (minutes):
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <input
+                    type="range"
+                    min="1"
+                    max="60"
+                    value={settings.inactivityTimeout}
+                    onChange={(e) => handleSettingChange("inactivityTimeout", parseInt(e.target.value))}
+                    style={{
+                      flex: "1",
+                      accentColor: isDark ? "#4285F4" : "#4285F4"
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={settings.inactivityTimeout}
+                    onChange={(e) => handleSettingChange("inactivityTimeout", parseInt(e.target.value))}
+                    style={{
+                      padding: "8px 12px",
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: "4px",
+                      width: "60px",
+                      fontSize: "14px",
+                      backgroundColor: inputBg,
+                      color: textColor,
+                      textAlign: "center"
+                    }}
+                  />
+                </div>
+                <p style={{ 
+                  fontSize: "12px", 
+                  color: isDark ? "#adb5bd" : "#888", 
+                  marginTop: "4px",
+                  marginBottom: "0"
+                }}>
+                  Monitoring will pause after this many minutes of no active tab
+                </p>
               </div>
             </div>
             

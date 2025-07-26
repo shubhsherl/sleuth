@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react"
+import { getSettings, saveSetting } from "./utils/storage"
 import "./styles.css"
 import NetworkPanel from "./tabs/network"
+
+// Define minimum supported dimensions
+const MIN_WIDTH = 350;  // px
 
 function SidePanel() {
   const [settings, setSettings] = useState({
@@ -12,10 +16,23 @@ function SidePanel() {
     maxRequests: 1000
   })
   const [activeTab, setActiveTab] = useState("network")
+  const [width, setWidth] = useState(window.innerWidth);
+  const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 500);
+  
+  // Track window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWidth(window.innerWidth);
+      setIsSmallScreen(window.innerWidth < 500);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Load settings on component mount
   useEffect(() => {
-    chrome.storage.sync.get([
+    getSettings([
       "enableShortcuts",
       "showCurlShortcut",
       "showAuthShortcut",
@@ -23,14 +40,7 @@ function SidePanel() {
       "theme",
       "maxRequests"
     ], (result) => {
-      setSettings({
-        enableShortcuts: result.enableShortcuts ?? true,
-        showCurlShortcut: result.showCurlShortcut ?? true,
-        showAuthShortcut: result.showAuthShortcut ?? true,
-        showUrlShortcut: result.showUrlShortcut ?? true,
-        theme: result.theme ?? "dark", // Default to dark theme
-        maxRequests: result.maxRequests ?? 1000
-      })
+      setSettings(result)
     })
   }, [])
   
@@ -38,7 +48,7 @@ function SidePanel() {
   const handleSettingChange = (key: string, value: any) => {
     const newSettings = { ...settings, [key]: value }
     setSettings(newSettings)
-    chrome.storage.sync.set({ [key]: value })
+    saveSetting(key, value)
   }
   
   // Toggle theme
@@ -64,6 +74,7 @@ function SidePanel() {
       style={{
         width: "100%",
         height: "100vh",
+        minWidth: `${MIN_WIDTH}px`,
         padding: "0",
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
         display: "flex",
@@ -76,17 +87,20 @@ function SidePanel() {
       <div style={{ 
         display: "flex", 
         borderBottom: `1px solid ${borderColor}`,
-        backgroundColor: headerBgColor
+        backgroundColor: headerBgColor,
+        flexWrap: isSmallScreen ? "wrap" : "nowrap"
       }}>
         <button 
           style={{
-            padding: "12px 16px",
+            padding: isSmallScreen ? "10px 12px" : "12px 16px",
             backgroundColor: activeTab === "network" ? buttonBgActive : buttonBgInactive,
             border: "none",
             borderBottom: activeTab === "network" ? `2px solid ${buttonBorderActive}` : "none",
             cursor: "pointer",
             fontWeight: activeTab === "network" ? "bold" : "normal",
-            color: textColor
+            color: textColor,
+            flex: isSmallScreen ? "1 1 50%" : "0 0 auto",
+            fontSize: isSmallScreen ? "14px" : "16px"
           }}
           onClick={() => setActiveTab("network")}>
           Network Inspector
@@ -94,13 +108,15 @@ function SidePanel() {
         
         <button 
           style={{
-            padding: "12px 16px",
+            padding: isSmallScreen ? "10px 12px" : "12px 16px",
             backgroundColor: activeTab === "settings" ? buttonBgActive : buttonBgInactive,
             border: "none",
             borderBottom: activeTab === "settings" ? `2px solid ${buttonBorderActive}` : "none",
             cursor: "pointer",
             fontWeight: activeTab === "settings" ? "bold" : "normal",
-            color: textColor
+            color: textColor,
+            flex: isSmallScreen ? "1 1 50%" : "0 0 auto",
+            fontSize: isSmallScreen ? "14px" : "16px"
           }}
           onClick={() => setActiveTab("settings")}>
           Settings
@@ -116,8 +132,8 @@ function SidePanel() {
         )}
         
         {activeTab === "settings" && (
-          <div style={{ padding: "16px", overflowY: "auto", height: "100%" }}>
-            <h2 style={{ marginTop: 0, marginBottom: "16px", color: textColor }}>
+          <div style={{ padding: isSmallScreen ? "12px" : "16px", overflowY: "auto", height: "100%" }}>
+            <h2 style={{ marginTop: 0, marginBottom: "16px", color: textColor, fontSize: isSmallScreen ? "18px" : "20px" }}>
               Sleuth Settings
             </h2>
             
@@ -125,14 +141,14 @@ function SidePanel() {
             <div style={{ 
               marginBottom: "24px", 
               backgroundColor: sectionBg, 
-              padding: "16px", 
+              padding: isSmallScreen ? "12px" : "16px", 
               borderRadius: "6px",
               border: `1px solid ${borderColor}`
             }}>
-              <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: "600" }}>Shortcuts</h3>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: isSmallScreen ? "14px" : "16px", fontWeight: "600" }}>Shortcuts</h3>
               
               <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "flex", alignItems: "center", fontSize: "14px" }}>
+                <label style={{ display: "flex", alignItems: "center", fontSize: isSmallScreen ? "13px" : "14px" }}>
                   <input
                     type="checkbox"
                     checked={settings.enableShortcuts}
@@ -144,8 +160,8 @@ function SidePanel() {
               </div>
               
               {settings.enableShortcuts && (
-                <div style={{ paddingLeft: "24px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <label style={{ display: "flex", alignItems: "center", fontSize: "14px" }}>
+                <div style={{ paddingLeft: isSmallScreen ? "16px" : "24px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ display: "flex", alignItems: "center", fontSize: isSmallScreen ? "13px" : "14px" }}>
                     <input
                       type="checkbox"
                       checked={settings.showCurlShortcut}
@@ -155,7 +171,7 @@ function SidePanel() {
                     Show "Copy as cURL" shortcut
                   </label>
                   
-                  <label style={{ display: "flex", alignItems: "center", fontSize: "14px" }}>
+                  <label style={{ display: "flex", alignItems: "center", fontSize: isSmallScreen ? "13px" : "14px" }}>
                     <input
                       type="checkbox"
                       checked={settings.showAuthShortcut}
@@ -165,7 +181,7 @@ function SidePanel() {
                     Show "Copy Auth Header" shortcut
                   </label>
                   
-                  <label style={{ display: "flex", alignItems: "center", fontSize: "14px" }}>
+                  <label style={{ display: "flex", alignItems: "center", fontSize: isSmallScreen ? "13px" : "14px" }}>
                     <input
                       type="checkbox"
                       checked={settings.showUrlShortcut}
@@ -182,14 +198,14 @@ function SidePanel() {
             <div style={{ 
               marginBottom: "24px", 
               backgroundColor: sectionBg, 
-              padding: "16px", 
+              padding: isSmallScreen ? "12px" : "16px", 
               borderRadius: "6px",
               border: `1px solid ${borderColor}`
             }}>
-              <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: "600" }}>Appearance</h3>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: isSmallScreen ? "14px" : "16px", fontWeight: "600" }}>Appearance</h3>
               
               <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", marginBottom: "6px", fontSize: "14px" }}>Theme:</label>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: isSmallScreen ? "13px" : "14px" }}>Theme:</label>
                 <select
                   value={settings.theme}
                   onChange={(e) => handleSettingChange("theme", e.target.value)}
@@ -200,7 +216,7 @@ function SidePanel() {
                     width: "100%",
                     backgroundColor: inputBg,
                     color: textColor,
-                    fontSize: "14px"
+                    fontSize: isSmallScreen ? "13px" : "14px"
                   }}
                 >
                   <option value="light">Light</option>
@@ -214,14 +230,14 @@ function SidePanel() {
             <div style={{ 
               marginBottom: "24px", 
               backgroundColor: sectionBg, 
-              padding: "16px", 
+              padding: isSmallScreen ? "12px" : "16px", 
               borderRadius: "6px",
               border: `1px solid ${borderColor}`
             }}>
-              <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: "600" }}>Network Inspector</h3>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: isSmallScreen ? "14px" : "16px", fontWeight: "600" }}>Network Inspector</h3>
               
               <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", marginBottom: "6px", fontSize: "14px" }}>Maximum requests to store:</label>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: isSmallScreen ? "13px" : "14px" }}>Maximum requests to store:</label>
                 <input
                   type="number"
                   min="100"
@@ -235,7 +251,7 @@ function SidePanel() {
                     width: "100%",
                     backgroundColor: inputBg,
                     color: textColor,
-                    fontSize: "14px"
+                    fontSize: isSmallScreen ? "13px" : "14px"
                   }}
                 />
               </div>
@@ -255,15 +271,15 @@ function SidePanel() {
                   borderRadius: "4px",
                   textDecoration: "none",
                   textAlign: "center",
-                  fontSize: "14px",
+                  fontSize: isSmallScreen ? "13px" : "14px",
                   display: "block"
                 }}>
                 View on GitHub
               </a>
             </div>
             
-            <div style={{ marginTop: "16px", fontSize: "12px", color: isDark ? "#888" : "#888", textAlign: "center" }}>
-              v0.0.1 &bull; Made with ❤️ by Shubham Singh
+            <div style={{ marginTop: "16px", fontSize: isSmallScreen ? "11px" : "12px", color: isDark ? "#888" : "#888", textAlign: "center" }}>
+              v0.0.2 &bull; Made with ❤️ by Shubham Singh
             </div>
           </div>
         )}

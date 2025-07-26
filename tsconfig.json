@@ -6,7 +6,8 @@
   "include": [
     ".plasmo/index.d.ts",
     "./**/*.ts",
-    "./**/*.tsx"
+    "./**/*.tsx",
+    "types/**/*.d.ts"
   ],
   "compilerOptions": {
     "paths": {
@@ -14,6 +15,10 @@
         "./*"
       ]
     },
-    "baseUrl": "."
+    "baseUrl": ".",
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
+    ]
   }
 }
